@@ -1,0 +1,7 @@
+{
+  "id": "GHA002",
+  "desc": "Workflow triggered by pull_request_target (risky for external forks)",
+  "severity": "medium",
+  "field": "on",
+  "regex": "pull_request_target"
+}

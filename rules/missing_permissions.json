@@ -1,0 +1,7 @@
+{
+  "id": "GHA005", 
+  "desc": "Workflow missing explicit permissions (principle of least privilege violation)",
+  "severity": "medium",
+  "field": "permissions",
+  "regex": "missing_permissions_check"
+}

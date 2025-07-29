@@ -1,0 +1,7 @@
+{
+  "id": "GHA004",
+  "desc": "Self-hosted runners on public repository (infrastructure exposure risk)",
+  "severity": "critical",
+  "field": "runs-on",
+  "regex": "self-hosted"
+}

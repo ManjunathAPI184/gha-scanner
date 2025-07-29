@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Actions Security Scanner Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .risk-critical { background: linear-gradient(135deg, #ff4444, #cc0000); }
+        .risk-high { background: linear-gradient(135deg, #ff8c00, #e67300); }
+        .risk-medium { background: linear-gradient(135deg, #ffd700, #ccac00); }
+        .risk-low { background: linear-gradient(135deg, #32cd32, #228b22); }
+        .metric-card { border-radius: 15px; color: white; padding: 20px; margin: 10px 0; }
+        .chart-container { background: white; border-radius: 10px; padding: 20px; margin: 20px 0; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .vulnerability-table { max-height: 400px; overflow-y: auto; }
+        .severity-critical { color: #dc3545; font-weight: bold; }
+        .severity-high { color: #fd7e14; font-weight: bold; }
+        .severity-medium { color: #ffc107; font-weight: bold; }
+        .severity-low { color: #28a745; font-weight: bold; }
+        .loading-spinner { display: none; text-align: center; margin: 20px; }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <header class="bg-dark text-white p-4 mb-4">
+                    <h1><i class="fas fa-shield-alt"></i> GitHub Actions Security Scanner</h1>
+                    <p class="mb-0">Comprehensive CI/CD Pipeline Security Analysis</p>
+                </header>
+            </div>
+        </div>
+
+        <!-- Scan Input -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-search"></i> Repository Scanner</h5>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <input type="text" id="repoInput" class="form-control" 
+                                       placeholder="Enter repository (e.g., microsoft/vscode)" 
+                                       value="microsoft/vscode">
+                            </div>
+                            <div class="col-md-4">
+                                <button onclick="scanRepository()" class="btn btn-primary w-100">
+                                    <i class="fas fa-play"></i> Scan Repository
+                                </button>
+                            </div>
+                        </div>
+                        <small class="text-muted">Set GITHUB_TOKEN environment variable for better rate limits</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div class="loading-spinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Scanning...</span>
+            </div>
+            <p class="mt-2">Analyzing repository security...</p>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" style="display: none;">
+            <!-- Summary Metrics -->
+            <div class="row" id="metrics">
+                <!-- Metrics will be populated here -->
+            </div>
+
+            <!-- Charts -->
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="chart-container">
+                        <div id="severityChart"></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="chart-container">
+                        <div id="ruleChart"></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="chart-container">
+                        <div id="fileChart"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Findings -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-bug"></i> Detailed Findings</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="vulnerability-table">
+                                <table class="table table-striped" id="findingsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Rule</th>
+                                            <th>Severity</th>
+                                            <th>File</th>
+                                            <th>Location</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="findingsBody">
+                                        <!-- Findings will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function scanRepository() {
+            const repo = document.getElementById('repoInput').value.trim();
+            if (!repo) {
+                alert('Please enter a repository name');
+                return;
+            }
+
+            // Show loading, hide results
+            document.querySelector('.loading-spinner').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+
+            try {
+                const response = await fetch('/scan', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({repo: repo})
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    alert('Scan failed: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                document.querySelector('.loading-spinner').style.display = 'none';
+            }
+        }
+
+        function displayResults(data) {
+            const {findings, summary, charts} = data;
+            
+            // Show results section
+            document.getElementById('results').style.display = 'block';
+            
+            // Display metrics
+            displayMetrics(summary);
+            
+            // Display charts
+            if (charts.severity_pie) {
+                Plotly.newPlot('severityChart', [JSON.parse(charts.severity_pie)]);
+            }
+            if (charts.rule_bar) {
+                Plotly.newPlot('ruleChart', [JSON.parse(charts.rule_bar)]);
+            }
+            if (charts.file_bar) {
+                Plotly.newPlot('fileChart', [JSON.parse(charts.file_bar)]);
+            }
+            
+            // Display findings table
+            displayFindings(findings);
+        }
+
+        function displayMetrics(summary) {
+            const riskClass = getRiskClass(summary.risk_score);
+            const metricsHtml = `
+                <div class="col-md-3">
+                    <div class="metric-card ${riskClass}">
+                        <h3><i class="fas fa-exclamation-triangle"></i> ${summary.total}</h3>
+                        <p>Total Issues</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card risk-critical">
+                        <h3><i class="fas fa-fire"></i> ${summary.by_severity.critical || 0}</h3>
+                        <p>Critical</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card risk-high">
+                        <h3><i class="fas fa-warning"></i> ${summary.by_severity.high || 0}</h3>
+                        <p>High Severity</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card ${riskClass}">
+                        <h3><i class="fas fa-chart-line"></i> ${summary.risk_score}</h3>
+                        <p>Risk Score</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('metrics').innerHTML = metricsHtml;
+        }
+
+        function displayFindings(findings) {
+            const tbody = document.getElementById('findingsBody');
+            tbody.innerHTML = findings.map(f => `
+                <tr>
+                    <td><span class="badge bg-primary">${f.rule}</span></td>
+                    <td><span class="severity-${f.severity}">${f.severity.toUpperCase()}</span></td>
+                    <td><code>${f.file}</code></td>
+                    <td><small>${f.loc}</small></td>
+                    <td>${f.desc}</td>
+                </tr>
+            `).join('');
+        }
+
+        function getRiskClass(score) {
+            if (score >= 80) return 'risk-critical';
+            if (score >= 60) return 'risk-high';
+            if (score >= 30) return 'risk-medium';
+            return 'risk-low';
+        }
+
+        // Allow Enter key to trigger scan
+        document.getElementById('repoInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') scanRepository();
+        });
+    </script>
+</body>
+</html>

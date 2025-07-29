@@ -1,0 +1,7 @@
+{
+  "id": "GHA008",
+  "desc": "Cache configuration vulnerable to poisoning attacks",
+  "severity": "high", 
+  "field": "cache",
+  "regex": "cache_poisoning_pattern"
+}

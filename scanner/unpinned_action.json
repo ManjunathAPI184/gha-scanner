@@ -1,0 +1,7 @@
+{
+  "id": "GHA001",
+  "desc": "Action version not pinned to commit SHA",
+  "severity": "high",
+  "field": "uses",
+  "regex": "@(v\\d+|latest)$"
+}
